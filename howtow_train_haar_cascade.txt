@@ -1,0 +1,21 @@
+## convert pngs to jpg
+for i in *.png; do convert "$i" -filter Lanczos "../$i.jpg"; done
+
+## renumber images
+ls -1F | grep -v "/$" | cat -n | while read n f; do mv "$f" "positive-$n.jpg"; done
+
+## create positive and negative list
+find ./positive_images -maxdepth 1 -iname "*.jpg" | sort > positive.txt
+find ./negative_images -maxdepth 1 -iname "*.jpg" | sort > negative.txt
+
+## create samples
+perl createsamples.pl positive.txt negative.txt samples 5000 "opencv_createsamples -maxxangle 1.0 -maxyangle 1.0 -maxzangle 1.8 -bgcolor 255 -bgthresh 8 -maxidev 40 -randinv -w 80 -h 80"
+
+## merge vec files
+python mergevec.py -v samples/ -o samples.vec
+
+## train cascade
+opencv_traincascade -data classifier -featureType LBP -vec samples.vec -bg negative.txt -numStages 30 -minHitRate 0.999 -maxFalseAlarmRate 0.4 -numPos 4000 -numNeg 2000 -w 80 -h 80 -mode ALL -precalcValBufSize 1024 -precalcIdxBufSize 1024
+
+## check samples
+opencv_createsamples -w 80 -h 80 -vec samples.vec
